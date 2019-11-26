@@ -320,7 +320,7 @@ def parse_yaml_for_modules(ydata):
                             elif isinstance(task['local_action'], string_types):
                                 module = task['local_action'].split()[0].strip()
                         if module == 'action':
-                            if iinstance(task['action'], Mapping):
+                            if isinstance(task['action'], Mapping):
                                 module = task['action']['module']
                             elif isinstance(task['action'], string_types):
                                 module = task['action'].split()[0].strip()
@@ -347,7 +347,16 @@ def parse_yaml_for_modules(ydata):
                                 module = task['action']['module']
                                 #import epdb; epdb.st()
                             elif isinstance(task['action'], string_types):
-                                module = task['action'].split()[0].strip()
+                                module = task['action']
+                                if module.startswith('{{'):
+                                    # action: {{ ansible_pkg_mgr }}
+                                    module = module.split('}}')[0]
+                                    module = module.replace('{{', '')
+                                    module = module.strip()
+                                elif ' ' in module:
+                                    module = module.split()[0].strip()
+                                else:
+                                    import epdb; epdb.st()
                             else:
                                 import epdb; epdb.st()
                         elif len(keys) == 1:
