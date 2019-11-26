@@ -1,12 +1,197 @@
 #!/usr/bin/python3 -tt
+import itertools
 import os
 import pathlib
 import sys
 from pprint import pprint
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 
+import requests
+import yaml
 from six import string_types
 from ansible.parsing.dataloader import DataLoader
+
+
+# Tests for core features
+CORE_FEATURE_TARGETS = frozenset((
+    'ansiballz_python',
+    'ansible',
+    'ansible-doc',
+    'ansible-galaxy',
+    'ansible-runner',
+    'any_errors_fatal',
+    'args',
+    'async',
+    'async_extra_data',
+    'async_fail',
+    'become',
+    'binary',
+    'binary_modules',
+    'binary_modules_posix',
+    'blocks',
+    'callback_default',
+    'callback_retry_task_name',
+    'changed_when',
+    'check_mode',
+    'cli',
+    'collections_plugin_namespace',
+    'collections_relative_imports',
+    'command_shell',
+    'collections',
+    'conditionals',
+    'config',
+    'connection',
+    'connection_local',
+    'connection_paramiko_ssh',
+    'connection_posix',
+    'connection_ssh',
+    'setup_deb_repo',  # needed by apt
+    'delegate_to',
+    'embedded_module',
+    'environment',
+    'error_from_connection',
+    'facts_d',
+    'failed_when',
+    'filters',
+    'gathering',
+    'gathering_facts',
+    'groupby_filter',
+    'handlers',
+    'hash',
+    'hosts_field',
+    'ignore_errors',
+    'ignore_unreachable',
+    'include_import',
+    'include_parent_role_vars',
+    'includes',
+    'interpreter_discovery_python',
+    'inventory',
+    'inventory_limit',
+    'inventory_path_with_comma',
+    'inventory_plugin_config',
+    'inventory_yaml',
+    'iterators',
+    'jinja2_native_types',
+    'lookup_inventory_hostnames',
+    'lookups',
+    'lookup_paths',  # Testing the file lookup
+    'loop_control',
+    'loops',
+    'meta_tasks',
+    'module_defaults',
+    'module_precedence',
+    'module_tracebacks',
+    'module_utils',
+    'no_log',
+    'old_style_cache_plugins',
+    'old_style_modules_posix',
+    'omit',
+    'order',
+    'parsing',
+    'plugin_filtering',
+    'plugin_loader',
+    'plugin_namespace',
+    'prepare_http_tests',  # For uri
+    'pull',
+    'rel_plugin_loading',
+    'remote_tmp',
+    'remote_tmp_dir',
+    'roles',
+    'run_modules',
+    'setup_cron',  # cron is in minimal
+    'setup_epel',  # setup_rpm_repo
+    'setup_nobody',
+    'setup_paramiko',  # Because the paramiko connection plugin is currently in minimal
+    'setup_passlib',   # For vars_prompt
+    'setup_pexpect',
+    'setup_remote_constraints',  # For uri
+    'setup_rpm_repo',  # dnf and yum
+    'special_vars',
+    'strategy_linear',
+    'tags',
+    'task_ordering',
+    'template_jinja2_latest',
+    'templating_settings',
+    'test_infra',
+    'tests',
+    'throttle',
+    'unicode',
+    'until',
+    'var_blending',
+    'var_precedence',
+    'var_templating',
+    'vars_prompt',
+    'vault',
+    'want_json_modules_posix',
+    'windows-paths',
+))
+
+
+SPECIAL_CASES = {
+    'virt_net': ['virt_net'],
+    'vsphere_file': ['vmware'],
+    'vcenter_folder': ['vmware'],
+    'vcenter_license': ['vmware'],
+    'setup_tls': ['rabbitmq', 'mqtt'],
+    'setup_win_device': ['win'],
+    'setup_win_psget': ['win'],
+    'prepare_win_tests': ['win'],
+    'setup_wildfly_server': ['jboss'],
+    'setup_sshkey': ['aws', 'hcloud'],
+    'setup_ssh_keygen': ['openssh'],
+    'read_csv': ['read_csv'],
+    'python_requirements_info': ['python_requirements_info'],
+    'prepare_tests': [],  # Empty main.yml.  Skip
+    'prepare_iosxr_tests': ['iosxr'],
+    'prepare_junos_tests': ['junos'],
+    'prepare_nios_tests': ['nios'],
+    'prepare_nuage_tests': ['nuage'],
+    'prepare_nxos_tests': ['nxos'],
+    'prepare_ovs_tests': ['openvswitch'],
+    'prepare_sros_tests': ['netconf'],
+    'prepare_vmware_tests': ['vmware'],
+    'prepare_vyos_tests': ['vyos'],
+    'setup_postgresql_replication': ['postgresql'],
+    'setup_postgresql_db': ['postgresql'],
+    'osx_defaults': ['osx_defaults'],
+    'setup_opennebula': ['one_host'],
+    'one_host': ['one_host'],
+    'setup_mysql_replication': ['mysql'],
+    'setup_mysql_db': ['mysql'],
+    'setup_mysql8': ['mysql'],
+    'setup_mosquitto': ['mqtt'],
+    'locale_gen': ['locale_gen'],
+    'listen_ports_facts': ['listen_ports_facts'],
+    'known_hosts': ['known_hosts'],
+    'java_cert': ['java_cert'],
+    'iso_extract': ['iso_extract'],
+    'ipify_facts': ['ipify_facts'],
+    'inventory_vmware_vm_inventory': ['vmware'],
+    'inventory_docker_swarm': ['docker'],
+    'inventory_docker_machine': ['docker'],
+    'inventory_cloudscale': ['cloudscale'],
+    'ini_file': ['ini_file'],
+    'github_issue': ['github_issue'],
+    'git_config': ['git_config'],
+    'get_certificate': ['crypto'],
+    'setup_flatpak_remote': ['flatpak'],
+    'deploy_helper': ['deploy_helper'],
+    'connection_winrm': ['win'],
+    'connection_windows_ssh': ['win'],
+    'connection_psrp': ['win'],
+    'connection_podman': ['podman'],
+    'connection_docker': ['docker'],
+    'cloud_init_data_facts': ['cloud_init'],
+    'certificate_complete_chain': ['crypto'],
+    'binary_modules_winrm': ['win'],
+    'authorized_key': ['authorized_key'],
+    'apache2_module': ['apache2_module'],
+    'docker-registry': ['docker'],
+    'cronvar': ['cron'],
+    'synchronize-buildah': ['synchronize'],
+}
+
 
 def parse_yaml_for_modules(ydata):
 
@@ -190,21 +375,146 @@ def parse_yaml_for_modules(ydata):
     return mrefs
 
 
+def get_minimal_set():
+    url = 'https://raw.githubusercontent.com/ansible-community/collection_migration/master/scenarios/minimal/ansible.yml'
+    data = requests.get(url)
+
+    parsed_data = yaml.safe_load(data.text)
+
+    return parsed_data['_core']
+def format_tasks(tasks):
+    return (os.path.splitext(os.path.basename(t))[0] for t in tasks)
+
+
+def get_minimal_tasks(minimal_plugins):
+    minimal_actions = minimal_plugins['action']
+    minimal_modules = minimal_plugins['modules']
+    minimal_tasks = frozenset(itertools.chain(format_tasks(minimal_actions), format_tasks(minimal_modules)))
+    return minimal_tasks
+
+
+def get_groups_of_tests(integration_dir, core_targets):
+    target_dir = os.path.join(integration_dir, 'targets')
+
+    groups = defaultdict(set)
+    for directory in os.listdir(target_dir):
+        # The first conditions are all special cases
+        if directory in SPECIAL_CASES:
+            for group in SPECIAL_CASES[directory]:
+                groups[group].add(os.path.join(target_dir, directory))
+        elif directory.startswith('digital_'):
+            groups['digital_ocean'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('sts_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('sqs_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('s3_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('rds_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('lambda_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('inventory_aws_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('iam_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('elb_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('ecs_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('ec2_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('dms_'):
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory == 'sns':
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory == 'setup_ec2':
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif directory == 'route53':
+            groups['aws'].add(os.path.join(target_dir, directory))
+        elif False:
+            # These are other potential special cases but I'm not sure how to deal with them:
+            #
+            # lookup_properties (?) uses ini lookup plugin but is that what it's testing(?)
+            # lookup_passwordstore (?)
+            # lookup_lmdb_kv
+            # lookup_hashi_vault
+            # netconf_config netconf_get netconf_rpc (?) netconf is a plugin type but all of these
+            #   tests require a specific device (junos, iosxr sros)
+            # inventory_kubevirt_conformance
+            # inventory_foreman_script
+            # inventory_foreman
+            # connection_lxd
+            # connection_lxc
+            # connection_libvirt_lxc
+            # connection_jail
+            # connection_chroot
+            # connection_buildah
+            # callback_log_plays
+            pass
+        elif directory in CORE_FEATURE_TARGETS:
+            # test targets for core features (vars_prompt, strategy)
+            groups['_core'].add(os.path.join(target_dir, directory))
+        elif directory in core_targets:
+            # The minimal set
+            groups['_core'].add(os.path.join(target_dir, directory))
+        elif directory.startswith('setup_'):
+            groups[directory[6:]].add(os.path.join(target_dir, directory))
+        elif directory.startswith('prepare_'):
+            groups[directory[8:]].add(os.path.join(target_dir, directory))
+        elif '_' in directory:
+            subject = directory.index('_')
+            groups[directory[:subject]].add(os.path.join(target_dir, directory))
+        else:
+            groups[directory].add(os.path.join(target_dir, directory))
+
+    return groups
+
+
+
+
 def main():
-    modules = set()
-    for target in sys.argv[1:]:
-        for root, directories, files in os.walk(target):
-            root = pathlib.Path(root)
-            for potential_file in files:
-                if not (potential_file.endswith('.yml') or potential_file.endswith('.yaml')):
-                    continue
+    # get tasks (modules and actions) in the minimal set
+    minimal_plugins = get_minimal_set()
+    minimal_tasks = get_minimal_tasks(minimal_plugins)
 
-                with open(root / potential_file) as f:
-                    data = DataLoader().load(f.read())
+    groups = get_groups_of_tests(sys.argv[1], minimal_tasks)
 
-                new_modules = parse_yaml_for_modules(data)
-                modules.update(new_modules)
+    # for each of the targets in the integration tests, figure out what modules are used.
+    modules = defaultdict(set)
+    for group, test_targets in groups.items():
+        for target in test_targets:
+            for root, _dummy, files in os.walk(target):
+                root = pathlib.Path(root)
+                for potential_file in files:
+                    if not (potential_file.endswith('.yml') or potential_file.endswith('.yaml')):
+                        continue
+
+                    with open(root / potential_file) as f:
+                        try:
+                            data = DataLoader().load(f.read())
+                        except Exception:
+                            print('Error while parsing yaml file %s' % (root / potential_file))
+                            raise
+
+                    new_modules = parse_yaml_for_modules(data)
+                    modules[group].update(new_modules)
+
+    for group_name, task_list in modules.items():
+        # Filter out modules already in minimal
+        task_list.difference_update(minimal_tasks)
+
+        # Filter out modules we're testing
+        tested_modules = set()
+        group_prefix = '%s_' % group_name
+        for task in task_list:
+            if task.startswith(group_prefix) or task == group_name:
+                tested_modules.add(task)
+        task_list.difference_update(tested_modules)
+
+    # print a report
     pprint(modules)
+
 
 if __name__ == '__main__':
     main()
