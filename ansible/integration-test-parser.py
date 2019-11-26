@@ -144,6 +144,7 @@ SPECIAL_CASES = {
     'read_csv': ['read_csv'],
     'python_requirements_info': ['python_requirements_info'],
     'prepare_tests': [],  # Empty main.yml.  Skip
+    'prepare_ios_tests': ['ios'],
     'prepare_iosxr_tests': ['iosxr'],
     'prepare_junos_tests': ['junos'],
     'prepare_nios_tests': ['nios'],
@@ -521,6 +522,8 @@ def main():
                 tested_modules.add(task)
         task_list.difference_update(tested_modules)
 
+    # Filter out empty groups [no cross-group deps]
+    modules = {k: v for k, v in modules.items() if v}
     # print a report
     pprint(modules)
 
