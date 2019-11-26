@@ -441,6 +441,12 @@ def which_groups(target, core_targets):
         return ['aws']
     elif target == 'route53':
         return ['aws']
+    elif target =='cloudtrail' or target.startswith('cloudtrail_'):
+        return ['aws']
+    elif target =='cloudformation' or target.startswith('cloudformation_'):
+        return ['aws']
+    elif target =='cloudfront' or target.startswith('cloudfront_'):
+        return ['aws']
     elif False:
         # These are other potential special cases but I'm not sure how to deal with them:
         #
