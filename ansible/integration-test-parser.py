@@ -106,6 +106,7 @@ CORE_FEATURE_TARGETS = frozenset((
     'setup_passlib',   # For vars_prompt
     'setup_pexpect',
     'setup_remote_constraints',  # For uri
+    'setup_remote_tmp_dir',  # For remote_tmp_dir test
     'setup_rpm_repo',  # dnf and yum
     'special_vars',
     'strategy_linear',
@@ -275,7 +276,7 @@ def parse_yaml_for_modules(ydata):
 
                     if 'block' in task:
                         if 'block' not in mrefs:
-                            mrefs.add('block')
+                            #mrefs.add('block')
                             tasks += task['block']
                         if 'rescue' in task:
                             tasks += task['rescue']
