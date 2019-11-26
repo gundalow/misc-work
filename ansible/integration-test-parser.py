@@ -394,80 +394,88 @@ def get_minimal_tasks(minimal_plugins):
     return minimal_tasks
 
 
+def which_groups(target, core_targets):
+    """
+    Return the groups a target belongs to
+    """
+    # The first conditions are all special cases
+    if target in SPECIAL_CASES:
+        return SPECIAL_CASES[target]
+    elif target.startswith('digital_'):
+        return ['digital_ocean']
+    elif target.startswith('sts_'):
+        return ['aws']
+    elif target.startswith('sqs_'):
+        return ['aws']
+    elif target.startswith('s3_'):
+        return ['aws']
+    elif target.startswith('rds_'):
+        return ['aws']
+    elif target.startswith('lambda_'):
+        return ['aws']
+    elif target.startswith('inventory_aws_'):
+        return ['aws']
+    elif target.startswith('iam_'):
+        return ['aws']
+    elif target.startswith('elb_'):
+        return ['aws']
+    elif target.startswith('ecs_'):
+        return ['aws']
+    elif target.startswith('ec2_'):
+        return ['aws']
+    elif target.startswith('dms_'):
+        return ['aws']
+    elif target in ('sns', 'sns_topic'):
+        return ['aws']
+    elif target == 'setup_ec2':
+        return ['aws']
+    elif target == 'route53':
+        return ['aws']
+    elif False:
+        # These are other potential special cases but I'm not sure how to deal with them:
+        #
+        # lookup_properties (?) uses ini lookup plugin but is that what it's testing(?)
+        # lookup_passwordstore (?)
+        # lookup_lmdb_kv
+        # lookup_hashi_vault
+        # netconf_config netconf_get netconf_rpc (?) netconf is a plugin type but all of these
+        #   tests require a specific device (junos, iosxr sros)
+        # inventory_kubevirt_conformance
+        # inventory_foreman_script
+        # inventory_foreman
+        # connection_lxd
+        # connection_lxc
+        # connection_libvirt_lxc
+        # connection_jail
+        # connection_chroot
+        # connection_buildah
+        # callback_log_plays
+        pass
+    elif target in CORE_FEATURE_TARGETS:
+        # test targets for core features (vars_prompt, strategy)
+        return ['_core']
+    elif target in core_targets:
+        # The minimal set
+        return ['_core']
+    elif target.startswith('setup_'):
+        return [target[6:]]
+    elif target.startswith('prepare_'):
+        return [target[8:]]
+    elif '_' in target:
+        subject = target.index('_')
+        return [target[:subject]]
+    else:
+        return [target]
+
 def get_groups_of_tests(integration_dir, core_targets):
     target_dir = os.path.join(integration_dir, 'targets')
 
     groups = defaultdict(set)
     for directory in os.listdir(target_dir):
         # The first conditions are all special cases
-        if directory in SPECIAL_CASES:
-            for group in SPECIAL_CASES[directory]:
-                groups[group].add(os.path.join(target_dir, directory))
-        elif directory.startswith('digital_'):
-            groups['digital_ocean'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('sts_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('sqs_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('s3_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('rds_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('lambda_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('inventory_aws_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('iam_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('elb_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('ecs_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('ec2_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('dms_'):
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory == 'sns':
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory == 'setup_ec2':
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif directory == 'route53':
-            groups['aws'].add(os.path.join(target_dir, directory))
-        elif False:
-            # These are other potential special cases but I'm not sure how to deal with them:
-            #
-            # lookup_properties (?) uses ini lookup plugin but is that what it's testing(?)
-            # lookup_passwordstore (?)
-            # lookup_lmdb_kv
-            # lookup_hashi_vault
-            # netconf_config netconf_get netconf_rpc (?) netconf is a plugin type but all of these
-            #   tests require a specific device (junos, iosxr sros)
-            # inventory_kubevirt_conformance
-            # inventory_foreman_script
-            # inventory_foreman
-            # connection_lxd
-            # connection_lxc
-            # connection_libvirt_lxc
-            # connection_jail
-            # connection_chroot
-            # connection_buildah
-            # callback_log_plays
-            pass
-        elif directory in CORE_FEATURE_TARGETS:
-            # test targets for core features (vars_prompt, strategy)
-            groups['_core'].add(os.path.join(target_dir, directory))
-        elif directory in core_targets:
-            # The minimal set
-            groups['_core'].add(os.path.join(target_dir, directory))
-        elif directory.startswith('setup_'):
-            groups[directory[6:]].add(os.path.join(target_dir, directory))
-        elif directory.startswith('prepare_'):
-            groups[directory[8:]].add(os.path.join(target_dir, directory))
-        elif '_' in directory:
-            subject = directory.index('_')
-            groups[directory[:subject]].add(os.path.join(target_dir, directory))
-        else:
-            groups[directory].add(os.path.join(target_dir, directory))
+        directory_groups = which_groups(directory, core_targets)
+        for group in directory_groups:
+            groups[group].add(os.path.join(target_dir, directory))
 
     return groups
 
@@ -507,9 +515,9 @@ def main():
 
         # Filter out modules we're testing
         tested_modules = set()
-        group_prefix = '%s_' % group_name
         for task in task_list:
-            if task.startswith(group_prefix) or task == group_name:
+            groups = which_groups(task, minimal_tasks)
+            if group_name in groups:
                 tested_modules.add(task)
         task_list.difference_update(tested_modules)
 
