@@ -1,4 +1,12 @@
 #!/usr/bin/python3 -tt
+
+"""
+Note:  mattclay is creating some tools which will be much better for answering the question:
+    * What does the core integration tests require?
+
+This script might still be helpful for answering the question:
+    * What modules are widely used by other integration tests?
+"""
 import itertools
 import os
 import pathlib
@@ -387,12 +395,14 @@ def parse_yaml_for_modules(ydata):
 
 
 def get_minimal_set():
-    url = 'https://raw.githubusercontent.com/ansible-community/collection_migration/master/scenarios/minimal/ansible.yml'
+    url = 'https://raw.githubusercontent.com/ansible-community/collection_migration/master/scenarios/nwo/ansible.yml'
     data = requests.get(url)
 
     parsed_data = yaml.safe_load(data.text)
 
     return parsed_data['_core']
+
+
 def format_tasks(tasks):
     return (os.path.splitext(os.path.basename(t))[0] for t in tasks)
 
@@ -483,6 +493,7 @@ def which_groups(target, core_targets):
     else:
         return [target]
 
+
 def get_groups_of_tests(integration_dir, core_targets):
     target_dir = os.path.join(integration_dir, 'targets')
 
@@ -494,8 +505,6 @@ def get_groups_of_tests(integration_dir, core_targets):
             groups[group].add(os.path.join(target_dir, directory))
 
     return groups
-
-
 
 
 def main():
