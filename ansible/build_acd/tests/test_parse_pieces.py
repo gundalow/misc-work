@@ -13,9 +13,10 @@ community.aws
 purestorage.flasharray
 """
 
+PARSED_PIECES = ['community.general', 'community.aws', 'ansible.posix', 'ansible.windows', 'purestorage.flasharray']
 
 def test_parse_pieces(tmp_path):
     pieces_filename = tmp_path / 'pieces.in'
     with open(pieces_filename, 'w') as f:
         f.write(PIECES)
-    assert cli.parse_pieces(pieces_filename)
+    assert cli.parse_pieces(pieces_filename) == PARSED_PIECES
