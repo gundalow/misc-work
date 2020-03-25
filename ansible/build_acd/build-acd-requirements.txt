@@ -1,5 +1,7 @@
 aiohttp
 semantic_version
+sh
+
 # Testing
 pytest-asyncio
 asynctest
