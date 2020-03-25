@@ -1,4 +1,5 @@
 aiohttp
+mako
 semantic_version
 sh
 
