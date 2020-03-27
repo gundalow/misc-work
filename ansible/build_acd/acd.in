@@ -1,4 +1,4 @@
-#ansible.amazon
+#amazon.aws
 ansible.netcommon
 ansible.posix
 ansible.windows
@@ -15,13 +15,13 @@ cisco.meraki
 cisco.mso
 cisco.nxos
 cisco.ucs
-#community.amazon
+community.aws
 community.azure
 community.crypto
 community.general
 community.grafana
 community.kubernetes
-#community.mongo
+#community.mongodb
 #community.network
 community.vmware
 #community.vmware_rest
@@ -42,7 +42,7 @@ netapp.aws
 netapp.elementsw
 netapp.ontap
 netbox.netbox
-#openstack.cloud
+openstack.cloud
 openvswitch.openvswitch
 #ovirt.ovirt
 purestorage.flasharray
