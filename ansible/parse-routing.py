@@ -16,6 +16,10 @@ def main():
         for plugin_data in plugins.values():
             replacement = plugin_data['redirect']
             collection = replacement.split('.')[0:2]
+            if collection[0] == 'testns':
+                # Blacklist the testns as we only use it for testing.
+                # We do not want someone to try to compromize testing infrastructure using this
+                continue
             collections.add('.'.join(collection))
 
     print(yaml.dump(sorted(list(collections))))
