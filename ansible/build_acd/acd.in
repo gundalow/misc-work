@@ -6,6 +6,7 @@ arista.eos
 awx.awx
 azure.azcollection
 check_point.mgmt
+chocolatey.chocolatey
 cisco.aci
 cisco.asa
 cisco.intersight
